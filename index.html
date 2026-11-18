@@ -160,7 +160,7 @@ let cur = {}, alt = 'א', editId = null;
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('show');clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('show'),2200)}
+function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('show');clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('show'),Math.max(2200,t.length*90))}
 function today(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
 function saveLocal(){localStorage.setItem(LS('cache'),JSON.stringify(db));localStorage.setItem(LS('pending'),JSON.stringify(pending));if(sha)localStorage.setItem(LS('sha'),sha);setSync()}
 function setSync(t){$('#sync').textContent = t || (pending.length?`${pending.length} ממתינות`:(cfg.token?'מסונכרן':'לא מחובר'))}
@@ -174,8 +174,15 @@ function api(path,opt={}){
 async function pull(){
   if(!cfg.token) return false;
   setSync('טוען…');
-  const r = await api('data.json?ref=main&t='+Date.now());
-  if(r.status===404){ db={version:1,records:[]}; sha=null; return true; }
+  let r;
+  try{ r = await api('data.json'); }catch(e){ throw new Error('אין חיבור לגיטהאב – בדוק קליטה ונסה שוב'); }
+  if(r.status===401) throw new Error('המפתח לא תקין (401) – העתק אותו שוב במלואו');
+  if(r.status===403) throw new Error('למפתח אין הרשאה (403) – צריך קריאה וכתיבה לתוכן');
+  if(r.status===404){
+    const rr = await fetch('https://api.github.com/repos/'+cfg.repo,{headers:{'Authorization':'Bearer '+cfg.token}}).catch(()=>null);
+    if(!rr || !rr.ok) throw new Error('למפתח אין גישה למאגר '+cfg.repo+' (404)');
+    db={version:1,records:[]}; sha=null; return true;
+  }
   if(!r.ok) throw new Error('קריאה נכשלה ('+r.status+')');
   const j = await r.json(); sha=j.sha; db=JSON.parse(b64d(j.content));
   if(!db.records) db.records=[];
@@ -339,7 +346,7 @@ $('#cancelEdit').onclick=e=>{e.preventDefault();endEdit()};
 $('#list').onclick=e=>{const c=e.target.closest('.card');if(c)startEdit(c.dataset.id)};
 ['#q-offense','#q-record','#q-judge','#q-status'].forEach(s=>$(s).onchange=render);
 $('#q-text').oninput=render;
-$('#s-save').onclick=async()=>{cfg.repo=$('#s-repo').value.trim()||cfg.repo;cfg.token=$('#s-token').value.trim();localStorage.setItem(LS('cfg'),JSON.stringify(cfg));try{await pull();applyOps(pending);saveLocal();render();toast('מחובר ✓');if(pending.length)push()}catch(e){toast(e.message)}};
+$('#s-save').onclick=async()=>{cfg.repo=$('#s-repo').value.trim()||cfg.repo;cfg.token=$('#s-token').value.replace(/\s+/g,'');localStorage.setItem(LS('cfg'),JSON.stringify(cfg));try{await pull();applyOps(pending);saveLocal();render();toast('מחובר ✓');if(pending.length)push()}catch(e){toast(e.message)}};
 $('#syncNow').onclick=async()=>{if(pending.length)await push();else{try{await pull();saveLocal();render();toast('עודכן מהשרת')}catch(e){toast(e.message)}}};
 
 // ---------- הפעלה ----------
