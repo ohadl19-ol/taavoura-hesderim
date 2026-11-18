@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f3a5f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>מאגר הסדרים</title>
+<style>
+:root{--bg:#f4f6f9;--card:#fff;--ink:#1c2430;--mut:#6b7684;--pri:#1f3a5f;--acc:#2f6fd6;--ok:#1e8e4e;--bad:#c0392b;--line:#e2e6ec;--chip:#eef2f7}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:16px}
+header{position:sticky;top:0;z-index:5;background:var(--pri);color:#fff;padding:10px 14px calc(0px);padding-top:max(10px,env(safe-area-inset-top))}
+header h1{margin:0 0 8px;font-size:19px;display:flex;justify-content:space-between;align-items:center}
+#sync{font-size:12px;font-weight:400;opacity:.85}
+nav{display:flex;gap:4px}
+nav button{flex:1;background:transparent;border:0;color:#cfd9e6;padding:10px 0;font-size:16px;border-bottom:3px solid transparent}
+nav button.on{color:#fff;border-color:#fff;font-weight:700}
+main{padding:12px 12px 120px;max-width:760px;margin:0 auto}
+.sec{background:var(--card);border-radius:12px;padding:10px 12px;margin-bottom:10px;box-shadow:0 1px 2px rgba(0,0,0,.05)}
+.lbl{font-size:13px;color:var(--mut);margin-bottom:6px;font-weight:600}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--chip);border-radius:20px;padding:9px 13px;font-size:15px;min-width:44px;text-align:center;cursor:pointer;user-select:none}
+.chip.on{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:700}
+.row{display:flex;gap:8px}
+.row>*{flex:1}
+input,textarea,select{width:100%;font:inherit;padding:10px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink)}
+textarea{min-height:60px;resize:vertical}
+.bar{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);padding:10px 12px;padding-bottom:max(10px,env(safe-area-inset-bottom));display:flex;gap:8px;z-index:6}
+.bar button,.btn{flex:1;border:0;border-radius:10px;padding:14px;font-size:16px;font-weight:700;cursor:pointer}
+.p{background:var(--acc);color:#fff}.s{background:var(--chip);color:var(--ink)}.d{background:#fdecea;color:var(--bad)}
+.hide{display:none!important}
+.card{background:var(--card);border-radius:12px;padding:10px 12px;margin-bottom:8px;box-shadow:0 1px 2px rgba(0,0,0,.05);cursor:pointer}
+.card .t{display:flex;justify-content:space-between;font-weight:700;margin-bottom:4px}
+.card .m{font-size:13px;color:var(--mut)}
+.card .pen{font-size:15px;margin-top:4px}
+.tag{display:inline-block;font-size:12px;padding:2px 8px;border-radius:10px;background:var(--chip);margin-inline-start:4px;font-weight:600}
+.st-התקבל{background:#d9f2e3;color:var(--ok)}.st-נדחה{background:#fbe0dc;color:var(--bad)}.st-הוצע{background:#fff3cd;color:#8a6d00}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px}
+.stat{background:var(--card);border-radius:10px;padding:8px;text-align:center}
+.stat b{display:block;font-size:20px;color:var(--pri)}
+.stat span{font-size:12px;color:var(--mut)}
+#toast{position:fixed;top:90px;left:50%;transform:translateX(-50%);background:#222;color:#fff;padding:10px 16px;border-radius:20px;font-size:14px;z-index:20;opacity:0;transition:.25s;pointer-events:none;max-width:90%}
+#toast.show{opacity:.95}
+.altbadge{background:var(--pri);color:#fff;border-radius:8px;padding:2px 8px;font-size:13px}
+small.h{color:var(--mut);font-size:12px;display:block;margin-top:4px}
+</style>
+</head>
+<body>
+<header>
+  <h1>מאגר עונשים בהסדרים <span id="sync"></span></h1>
+  <nav>
+    <button data-tab="add" class="on">הזנה</button>
+    <button data-tab="db">מאגר</button>
+    <button data-tab="set">הגדרות</button>
+  </nav>
+</header>
+
+<main>
+  <!-- הזנה -->
+  <section id="tab-add">
+    <div class="sec">
+      <div class="row">
+        <div><div class="lbl">תאריך</div><input type="date" id="f-date"></div>
+        <div><div class="lbl">מספר תיק</div><input id="f-caseNo" inputmode="text" placeholder="לא חובה"></div>
+      </div>
+    </div>
+    <div id="fields"></div>
+    <div class="sec">
+      <div class="lbl">הערות</div>
+      <textarea id="f-notes" placeholder="פרטים נוספים"></textarea>
+    </div>
+    <div id="editing" class="sec hide" style="background:#fff8e1">עריכת רשומה קיימת · <a href="#" id="cancelEdit">ביטול</a></div>
+  </section>
+
+  <!-- מאגר -->
+  <section id="tab-db" class="hide">
+    <div class="sec">
+      <div class="row">
+        <select id="q-offense"></select>
+        <select id="q-record"></select>
+      </div>
+      <div class="row" style="margin-top:6px">
+        <select id="q-judge"></select>
+        <select id="q-status"></select>
+      </div>
+      <input id="q-text" placeholder="חיפוש חופשי (מספר תיק, הערות)" style="margin-top:6px">
+    </div>
+    <div class="stats" id="stats"></div>
+    <div id="list"></div>
+  </section>
+
+  <!-- הגדרות -->
+  <section id="tab-set" class="hide">
+    <div class="sec">
+      <div class="lbl">מאגר הנתונים בגיטהאב (בעלים/שם)</div>
+      <input id="s-repo" dir="ltr" placeholder="ohadl19-ol/taavoura-hesderim-data">
+      <div class="lbl" style="margin-top:10px">מפתח גישה</div>
+      <input id="s-token" dir="ltr" type="password" placeholder="github_pat_...">
+      <small class="h">המפתח נשמר רק במכשיר הזה. מומלץ מפתח שמוגבל למאגר הנתונים בלבד, עם הרשאת קריאה וכתיבה לתוכן.</small>
+      <div class="row" style="margin-top:10px">
+        <button class="btn p" id="s-save">שמירה וחיבור</button>
+      </div>
+    </div>
+    <div class="sec">
+      <div class="lbl">ייצוא</div>
+      <div class="row">
+        <button class="btn s" id="exp-csv">הורדת קובץ לאקסל</button>
+        <button class="btn s" id="exp-json">גיבוי מלא</button>
+      </div>
+    </div>
+    <div class="sec">
+      <div class="lbl">ממתינות לסנכרון</div>
+      <div id="pendingInfo" class="m">אין</div>
+      <button class="btn s" id="syncNow" style="margin-top:8px;width:100%">סנכרון עכשיו</button>
+    </div>
+  </section>
+</main>
+
+<div class="bar" id="addBar">
+  <button class="s" id="b-alt">שמירה והוספת חלופה</button>
+  <button class="p" id="b-save">שמירה</button>
+</div>
+<div class="bar hide" id="editBar">
+  <button class="d" id="b-del">מחיקה</button>
+  <button class="p" id="b-upd">עדכון</button>
+</div>
+<div id="toast"></div>
+
+<script>
+// ---------- הגדרת השדות ----------
+const F = [
+  {k:'offense', l:'עבירה', o:['נהיגה בשכרות','סירוב לבדיקה','תקנה 26(2)','נהיגה בזמן פסילה','נהיגה ללא רישיון','ללא רישיון לסוג רכב','מהירות מופרזת','תאונה עם נפגעים','אחר'], keep:true},
+  {k:'record', l:'עבר רלוונטי', o:['ללא עבר רלוונטי','שכרות ×1','שכרות ×2 ומעלה','זמן פסילה','ללא רישיון','שכרות + זמן פסילה','עבר לא דומה','אחר'], keep:true},
+  {k:'pending', l:'תנאי תלוי ועומד', o:['אין','מאסר ע"ת','פסילה ע"ת','מאסר + פסילה ע"ת'], keep:true},
+  {k:'defects', l:'רמת כשלים', o:['ללא','קל','בינוני','חמור'], keep:true},
+  {k:'disq', l:'פסילה בפועל (חודשים)', o:[0,3,4,5,6,8,9,10,11,12,14,15,16,18,20,24,30,36,48,60], num:true, other:true},
+  {k:'service', l:'עבודות שירות (חודשים)', o:[0,1,2,3,4,5,6,7,8,9], num:true, other:true},
+  {k:'prison', l:'מאסר בפועל (חודשים)', o:[0,1,2,3,4,6,8,10,12,18,24], num:true, other:true},
+  {k:'activation', l:'הפעלת תנאי', o:['הופעל במצטבר','הופעל בחופף','הופעל חלקית','הוארך','לא רלוונטי']},
+  {k:'disqCond', l:'פסילה על תנאי (חודשים)', o:[0,3,4,6,9,12], num:true, other:true},
+  {k:'prisonCond', l:'מאסר על תנאי (חודשים)', o:[0,2,3,4,5,6,8,10,12], num:true, other:true},
+  {k:'fine', l:'קנס (₪)', o:[0,500,750,1000,1500,2000,2500,3000,4000,5000], num:true, other:true},
+  {k:'bond', l:'התחייבות (₪)', o:[0,2000,3000,5000,10000], num:true, other:true},
+  {k:'judge', l:'שופט', o:['עספור','אררה','קלוגרמן','אחר'], keep:true},
+  {k:'status', l:'סטטוס', o:['הוצע','התקבל','נדחה','נגזר אחרת']},
+];
+const ALTS = ['א','ב','ג','ד'];
+const KEEP = ['date','caseNo', ...F.filter(f=>f.keep).map(f=>f.k)];
+
+// ---------- מצב ----------
+const LS = k => 'hesderim.'+k;
+let cfg = JSON.parse(localStorage.getItem(LS('cfg'))||'{}');
+if(!cfg.repo) cfg.repo = 'ohadl19-ol/taavoura-hesderim-data';
+let db = JSON.parse(localStorage.getItem(LS('cache'))||'{"version":1,"records":[]}');
+let pending = JSON.parse(localStorage.getItem(LS('pending'))||'[]'); // פעולות שטרם נשלחו
+let sha = localStorage.getItem(LS('sha'))||null;
+let cur = {}, alt = 'א', editId = null;
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('show');clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('show'),2200)}
+function today(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function saveLocal(){localStorage.setItem(LS('cache'),JSON.stringify(db));localStorage.setItem(LS('pending'),JSON.stringify(pending));if(sha)localStorage.setItem(LS('sha'),sha);setSync()}
+function setSync(t){$('#sync').textContent = t || (pending.length?`${pending.length} ממתינות`:(cfg.token?'מסונכרן':'לא מחובר'))}
+
+// ---------- גיטהאב ----------
+const b64e = s => btoa(String.fromCharCode(...new TextEncoder().encode(s)));
+const b64d = s => new TextDecoder().decode(Uint8Array.from(atob(s.replace(/\n/g,'')),c=>c.charCodeAt(0)));
+function api(path,opt={}){
+  return fetch(`https://api.github.com/repos/${cfg.repo}/contents/${path}`,{...opt,headers:{'Authorization':'Bearer '+cfg.token,'Accept':'application/vnd.github+json',...(opt.headers||{})},cache:'no-store'});
+}
+async function pull(){
+  if(!cfg.token) return false;
+  setSync('טוען…');
+  const r = await api('data.json?ref=main&t='+Date.now());
+  if(r.status===404){ db={version:1,records:[]}; sha=null; return true; }
+  if(!r.ok) throw new Error('קריאה נכשלה ('+r.status+')');
+  const j = await r.json(); sha=j.sha; db=JSON.parse(b64d(j.content));
+  if(!db.records) db.records=[];
+  return true;
+}
+function applyOps(ops){
+  for(const op of ops){
+    const i = db.records.findIndex(x=>x.id===op.rec?.id || x.id===op.id);
+    if(op.t==='add' && i<0) db.records.push(op.rec);
+    else if(op.t==='upd' && i>=0) db.records[i]=op.rec;
+    else if(op.t==='del' && i>=0) db.records.splice(i,1);
+  }
+}
+async function push(){
+  if(!cfg.token || !pending.length){ setSync(); return; }
+  for(let attempt=0; attempt<3; attempt++){
+    try{
+      await pull(); applyOps(pending);
+      db.records.sort((a,b)=>(b.date||'').localeCompare(a.date||'')||(b.createdAt||'').localeCompare(a.createdAt||''));
+      const body = {message:`עדכון מאגר (${pending.length})`, content:b64e(JSON.stringify(db,null,1)), branch:'main'};
+      if(sha) body.sha=sha;
+      const r = await api('data.json',{method:'PUT',body:JSON.stringify(body)});
+      if(r.status===409||r.status===422){ continue; }
+      if(!r.ok) throw new Error('שמירה נכשלה ('+r.status+')');
+      const j = await r.json(); sha=j.content.sha; pending=[]; saveLocal(); render(); return true;
+    }catch(e){ setSync('שגיאה'); toast(e.message+' – נשמר במכשיר וינסה שוב'); applyOps(pending); saveLocal(); render(); return false; }
+  }
+  toast('התנגשות בשמירה – נסה שוב'); return false;
+}
+
+// ---------- טופס ----------
+function buildFields(){
+  const box = $('#fields'); box.innerHTML='';
+  // חלופה
+  const a = document.createElement('div'); a.className='sec';
+  a.innerHTML = `<div class="lbl">חלופה</div><div class="chips" data-k="__alt">${ALTS.map(x=>`<div class="chip" data-v="${x}">${x}</div>`).join('')}</div>`;
+  box.appendChild(a);
+  for(const f of F){
+    const d=document.createElement('div'); d.className='sec';
+    d.innerHTML = `<div class="lbl">${f.l}</div><div class="chips" data-k="${f.k}">${f.o.map(v=>`<div class="chip" data-v="${esc(v)}">${f.k==='fine'||f.k==='bond'?Number(v).toLocaleString('he-IL'):esc(v)}</div>`).join('')}${f.other?`<div class="chip" data-other="1">אחר…</div>`:''}</div>`;
+    box.appendChild(d);
+  }
+  box.addEventListener('click',e=>{
+    const c=e.target.closest('.chip'); if(!c) return;
+    const k=c.parentElement.dataset.k;
+    if(k==='__alt'){ alt=c.dataset.v; paint(); return; }
+    const f=F.find(x=>x.k===k);
+    if(c.dataset.other){
+      const v=prompt(f.l+' – ערך אחר:', cur[k]??''); if(v===null) return;
+      cur[k] = v.trim()===''?undefined:(f.num?Number(v.replace(/,/g,'')):v.trim());
+    } else {
+      const v = f.num?Number(c.dataset.v):c.dataset.v;
+      cur[k] = (cur[k]===v)?undefined:v;
+    }
+    paint();
+  });
+}
+function paint(){
+  document.querySelectorAll('#fields .chips').forEach(ch=>{
+    const k=ch.dataset.k;
+    ch.querySelectorAll('.chip').forEach(c=>{
+      if(k==='__alt'){ c.classList.toggle('on',c.dataset.v===alt); return; }
+      const f=F.find(x=>x.k===k);
+      if(c.dataset.other){ const inList=f.o.map(String).includes(String(cur[k])); const has=cur[k]!==undefined&&!inList; c.classList.toggle('on',has); c.textContent=has?String(cur[k]):'אחר…'; return; }
+      c.classList.toggle('on', cur[k]!==undefined && String(cur[k])===c.dataset.v);
+    });
+  });
+}
+function readForm(){
+  const r={...cur}; r.date=$('#f-date').value||today(); r.caseNo=$('#f-caseNo').value.trim(); r.notes=$('#f-notes').value.trim(); r.alt=alt;
+  Object.keys(r).forEach(k=>{if(r[k]===undefined||r[k]==='')delete r[k]});
+  return r;
+}
+function resetForm(keepCtx){
+  const prev = readForm();
+  cur={}; $('#f-notes').value='';
+  if(keepCtx){ KEEP.forEach(k=>{ if(prev[k]!==undefined && k!=='date' && k!=='caseNo') cur[k]=prev[k]; }); alt = ALTS[Math.min(ALTS.indexOf(prev.alt)+1,ALTS.length-1)]; if(prev.status) cur.status=prev.status; }
+  else { $('#f-caseNo').value=''; $('#f-date').value=today(); alt='א'; }
+  paint();
+}
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
+async function saveRec(keepCtx){
+  const r=readForm();
+  if(!r.offense){toast('בחר עבירה');return}
+  if(r.disq===undefined && r.service===undefined && r.prison===undefined && r.fine===undefined){toast('בחר לפחות רכיב עונש אחד');return}
+  r.id=uid(); r.createdAt=new Date().toISOString(); r.by='app';
+  pending.push({t:'add',rec:r}); applyOps([{t:'add',rec:r}]); saveLocal();
+  toast(keepCtx?`חלופה ${r.alt} נשמרה – הזן את חלופה ${ALTS[Math.min(ALTS.indexOf(r.alt)+1,3)]}`:'נשמר');
+  resetForm(keepCtx); render(); push();
+}
+function startEdit(id){
+  const r=db.records.find(x=>x.id===id); if(!r) return;
+  editId=id; cur={}; F.forEach(f=>{if(r[f.k]!==undefined)cur[f.k]=r[f.k]});
+  $('#f-date').value=r.date||''; $('#f-caseNo').value=r.caseNo||''; $('#f-notes').value=r.notes||''; alt=r.alt||'א';
+  paint(); show('add'); $('#editing').classList.remove('hide'); $('#addBar').classList.add('hide'); $('#editBar').classList.remove('hide'); window.scrollTo(0,0);
+}
+function endEdit(){editId=null;$('#editing').classList.add('hide');$('#addBar').classList.remove('hide');$('#editBar').classList.add('hide');resetForm(false)}
+
+// ---------- מאגר ----------
+function fillSel(id,label,vals){const s=$(id);const v=s.value;s.innerHTML=`<option value="">${label}: הכל</option>`+vals.map(x=>`<option>${esc(x)}</option>`).join('');s.value=v}
+function filtered(){
+  const o=$('#q-offense').value,rc=$('#q-record').value,j=$('#q-judge').value,st=$('#q-status').value,t=$('#q-text').value.trim();
+  return db.records.filter(r=>(!o||r.offense===o)&&(!rc||r.record===rc)&&(!j||r.judge===j)&&(!st||r.status===st)&&(!t||JSON.stringify(r).includes(t)));
+}
+function avg(list,k){const v=list.map(r=>Number(r[k])).filter(x=>!isNaN(x)&&x!==null&&x!==undefined);const vv=list.filter(r=>r[k]!==undefined&&r[k]!=='').map(r=>Number(r[k]));if(!vv.length)return '—';return (vv.reduce((a,b)=>a+b,0)/vv.length).toFixed(1).replace(/\.0$/,'')}
+function range(list,k){const vv=list.filter(r=>r[k]!==undefined&&r[k]!=='').map(r=>Number(r[k]));if(!vv.length)return '';return Math.min(...vv)===Math.max(...vv)?'':`${Math.min(...vv)}–${Math.max(...vv)}`}
+function sentence(r){
+  const p=[];
+  if(r.prison) p.push(`${r.prison} ח' מאסר`);
+  if(r.service) p.push(`${r.service} ח' עב"ש`);
+  if(r.disq!==undefined) p.push(`${r.disq} ח' פסילה`);
+  if(r.activation && r.activation!=='לא רלוונטי') p.push(`תנאי ${r.activation}`);
+  if(r.prisonCond) p.push(`${r.prisonCond} ח' מאסר ע"ת`);
+  if(r.disqCond) p.push(`${r.disqCond} ח' פסילה ע"ת`);
+  if(r.fine) p.push(`קנס ${Number(r.fine).toLocaleString('he-IL')} ₪`);
+  if(r.bond) p.push(`התחייבות ${Number(r.bond).toLocaleString('he-IL')} ₪`);
+  return p.join(' · ')||'—';
+}
+function render(){
+  fillSel('#q-offense','עבירה',F[0].o); fillSel('#q-record','עבר',F[1].o);
+  fillSel('#q-judge','שופט',F.find(f=>f.k==='judge').o); fillSel('#q-status','סטטוס',F.find(f=>f.k==='status').o);
+  const L=filtered();
+  const acc=L.filter(r=>r.status==='התקבל');
+  $('#stats').innerHTML=`
+    <div class="stat"><b>${L.length}</b><span>רשומות</span></div>
+    <div class="stat"><b>${avg(L,'disq')}</b><span>פסילה ממוצעת ${range(L,'disq')}</span></div>
+    <div class="stat"><b>${avg(L,'service')}</b><span>עב"ש ממוצע ${range(L,'service')}</span></div>`
+    + (acc.length?`<div class="stat"><b>${acc.length}</b><span>התקבלו</span></div><div class="stat"><b>${avg(acc,'disq')}</b><span>פסילה (שהתקבלו)</span></div><div class="stat"><b>${avg(acc,'service')}</b><span>עב"ש (שהתקבלו)</span></div>`:'');
+  $('#list').innerHTML = L.length? L.map(r=>`
+    <div class="card" data-id="${r.id}">
+      <div class="t"><span>${esc(r.offense||'')} <span class="altbadge">${esc(r.alt||'א')}</span></span><span class="tag st-${esc(r.status||'')}">${esc(r.status||'')}</span></div>
+      <div class="m">${esc((r.date||'').split('-').reverse().join('.'))}${r.caseNo?' · תיק '+esc(r.caseNo):''}${r.judge?' · '+esc(r.judge):''}</div>
+      <div class="m">עבר: ${esc(r.record||'—')} · תנאי: ${esc(r.pending||'—')} · כשלים: ${esc(r.defects||'—')}</div>
+      <div class="pen">${esc(sentence(r))}</div>
+      ${r.notes?`<div class="m" style="margin-top:4px">${esc(r.notes)}</div>`:''}
+    </div>`).join('') : '<div class="sec m">אין רשומות</div>';
+  $('#pendingInfo').textContent = pending.length? `${pending.length} פעולות ממתינות`:'אין';
+  setSync();
+}
+
+// ---------- ייצוא ----------
+function download(name,text,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click()}
+$('#exp-csv').onclick=()=>{
+  const cols=['date','caseNo','alt',...F.map(f=>f.k),'notes'];
+  const heads=['תאריך','מספר תיק','חלופה',...F.map(f=>f.l),'הערות'];
+  const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;
+  const csv='﻿'+heads.map(q).join(',')+'\n'+db.records.map(r=>cols.map(c=>q(r[c])).join(',')).join('\n');
+  download('מאגר-הסדרים.csv',csv,'text/csv;charset=utf-8');
+};
+$('#exp-json').onclick=()=>download('hesderim-backup.json',JSON.stringify(db,null,1),'application/json');
+
+// ---------- ניווט ----------
+function show(t){document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));['add','db','set'].forEach(x=>$('#tab-'+x).classList.toggle('hide',x!==t));$('#addBar').classList.toggle('hide',t!=='add'||!!editId);$('#editBar').classList.toggle('hide',t!=='add'||!editId);if(t==='db')render()}
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>show(b.dataset.tab));
+$('#b-save').onclick=()=>saveRec(false);
+$('#b-alt').onclick=()=>saveRec(true);
+$('#b-upd').onclick=()=>{const r={...db.records.find(x=>x.id===editId),...readForm()};F.forEach(f=>{if(cur[f.k]===undefined)delete r[f.k]});r.id=editId;r.updatedAt=new Date().toISOString();pending.push({t:'upd',rec:r});applyOps([{t:'upd',rec:r}]);saveLocal();toast('עודכן');endEdit();show('db');push()};
+$('#b-del').onclick=()=>{if(!confirm('למחוק את הרשומה?'))return;pending.push({t:'del',id:editId});applyOps([{t:'del',id:editId}]);saveLocal();toast('נמחק');endEdit();show('db');push()};
+$('#cancelEdit').onclick=e=>{e.preventDefault();endEdit()};
+$('#list').onclick=e=>{const c=e.target.closest('.card');if(c)startEdit(c.dataset.id)};
+['#q-offense','#q-record','#q-judge','#q-status'].forEach(s=>$(s).onchange=render);
+$('#q-text').oninput=render;
+$('#s-save').onclick=async()=>{cfg.repo=$('#s-repo').value.trim()||cfg.repo;cfg.token=$('#s-token').value.trim();localStorage.setItem(LS('cfg'),JSON.stringify(cfg));try{await pull();applyOps(pending);saveLocal();render();toast('מחובר ✓');if(pending.length)push()}catch(e){toast(e.message)}};
+$('#syncNow').onclick=async()=>{if(pending.length)await push();else{try{await pull();saveLocal();render();toast('עודכן מהשרת')}catch(e){toast(e.message)}}};
+
+// ---------- הפעלה ----------
+buildFields(); $('#f-date').value=today(); paint();
+$('#s-repo').value=cfg.repo; $('#s-token').value=cfg.token||'';
+render();
+if(!cfg.token){ show('set'); toast('יש להדביק מפתח גישה פעם אחת'); }
+else { pull().then(()=>{applyOps(pending);saveLocal();render();if(pending.length)push()}).catch(e=>{toast(e.message);setSync('לא מקוון')}); }
+</script>
+</body>
+</html>
