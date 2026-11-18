@@ -131,7 +131,8 @@ small.h{color:var(--mut);font-size:12px;display:block;margin-top:4px}
 // ---------- הגדרת השדות ----------
 const F = [
   {k:'offense', l:'עבירה', o:['שכרות 300','שכרות 500','שכרות 700','שכרות 900','סמים','סירוב','נהיגה בזמן פסילה','בלתי מורשה מעולם','ללא רישיון לסוג רכב','מהירות מופרזת','תאונה עם נפגעים','אחר'], keep:true},
-  {k:'record', l:'עבר רלוונטי', o:['ללא עבר רלוונטי','שכרות ×1','שכרות ×2 ומעלה','זמן פסילה ×1','זמן פסילה ×2 ומעלה','בלתי מורשה מעולם ×1','בלתי מורשה מעולם ×2 ומעלה','שכרות + זמן פסילה','עבר לא דומה','אחר'], keep:true},
+  {k:'record', l:'עבר דומה (לעבירה הנוכחית)', o:['ללא עבר דומה','הרשעה דומה אחת','2 הרשעות דומות','3 הרשעות דומות ומעלה'], keep:true},
+  {k:'otherRecord', l:'הרשעות חמורות אחרות (אפשר לסמן כמה)', o:['שכרות','סמים','סירוב','נהיגה בפסילה','בלתי מורשה מעולם','תאונה עם נפגעים','אחר'], keep:true, multi:true},
   {k:'pending', l:'תנאי תלוי ועומד', o:['אין','מע"ת','פע"ת','מע"ת + פע"ת'], keep:true},
   {k:'defects', l:'רמת כשלים', o:['ללא','קל','בינוני','חמור'], keep:true},
   {k:'disq', l:'פסילה בפועל (חודשים)', o:[0,3,4,5,6,8,9,10,11,12,14,15,16,18,20,24,30,36,48,60], num:true, other:true},
@@ -227,7 +228,8 @@ function buildFields(){
       cur[k] = v.trim()===''?undefined:(f.num?Number(v.replace(/,/g,'')):v.trim());
     } else {
       const v = f.num?Number(c.dataset.v):c.dataset.v;
-      cur[k] = (cur[k]===v)?undefined:v;
+      if(f.multi){ const a=Array.isArray(cur[k])?[...cur[k]]:[]; const i=a.indexOf(v); i<0?a.push(v):a.splice(i,1); cur[k]=a.length?a:undefined; }
+      else cur[k] = (cur[k]===v)?undefined:v;
     }
     paint();
   });
@@ -239,19 +241,19 @@ function paint(){
       if(k==='__alt'){ c.classList.toggle('on',c.dataset.v===alt); return; }
       const f=F.find(x=>x.k===k);
       if(c.dataset.other){ const inList=f.o.map(String).includes(String(cur[k])); const has=cur[k]!==undefined&&!inList; c.classList.toggle('on',has); c.textContent=has?String(cur[k]):'אחר…'; return; }
-      c.classList.toggle('on', cur[k]!==undefined && String(cur[k])===c.dataset.v);
+      c.classList.toggle('on', f.multi ? (Array.isArray(cur[k]) && cur[k].includes(c.dataset.v)) : (cur[k]!==undefined && String(cur[k])===c.dataset.v));
     });
   });
 }
 function readForm(){
   const r={...cur}; r.date=$('#f-date').value||today(); r.caseNo=$('#f-caseNo').value.trim(); r.notes=$('#f-notes').value.trim(); r.alt=alt;
-  Object.keys(r).forEach(k=>{if(r[k]===undefined||r[k]==='')delete r[k]});
+  Object.keys(r).forEach(k=>{if(r[k]===undefined||r[k]===''||(Array.isArray(r[k])&&!r[k].length))delete r[k]});
   return r;
 }
 function resetForm(keepCtx){
   const prev = readForm();
   cur={}; $('#f-notes').value='';
-  if(keepCtx){ KEEP.forEach(k=>{ if(prev[k]!==undefined && k!=='date' && k!=='caseNo') cur[k]=prev[k]; }); alt = ALTS[Math.min(ALTS.indexOf(prev.alt)+1,ALTS.length-1)]; if(prev.status) cur.status=prev.status; }
+  if(keepCtx){ KEEP.forEach(k=>{ if(prev[k]!==undefined && k!=='date' && k!=='caseNo') cur[k]=Array.isArray(prev[k])?[...prev[k]]:prev[k]; }); alt = ALTS[Math.min(ALTS.indexOf(prev.alt)+1,ALTS.length-1)]; if(prev.status) cur.status=prev.status; }
   else { $('#f-caseNo').value=''; $('#f-date').value=today(); alt='א'; }
   paint();
 }
@@ -294,7 +296,7 @@ function sentence(r){
   return p.join(' · ')||'—';
 }
 function render(){
-  fillSel('#q-offense','עבירה',F[0].o); fillSel('#q-record','עבר',F[1].o);
+  fillSel('#q-offense','עבירה',F[0].o); fillSel('#q-record','עבר דומה',F[1].o);
   fillSel('#q-judge','שופט',F.find(f=>f.k==='judge').o); fillSel('#q-status','סטטוס',F.find(f=>f.k==='status').o);
   const L=filtered();
   const acc=L.filter(r=>r.status==='התקבל');
@@ -307,7 +309,7 @@ function render(){
     <div class="card" data-id="${r.id}">
       <div class="t"><span>${esc(r.offense||'')} <span class="altbadge">${esc(r.alt||'א')}</span></span><span class="tag st-${esc(r.status||'')}">${esc(r.status||'')}</span></div>
       <div class="m">${esc((r.date||'').split('-').reverse().join('.'))}${r.caseNo?' · תיק '+esc(r.caseNo):''}${r.judge?' · '+esc(r.judge):''}</div>
-      <div class="m">עבר: ${esc(r.record||'—')} · תנאי: ${esc(r.pending||'—')} · כשלים: ${esc(r.defects||'—')}</div>
+      <div class="m">עבר דומה: ${esc(r.record||'—')}${(r.otherRecord||[]).length?' · אחר: '+esc(r.otherRecord.join(', ')):''} · תנאי: ${esc(r.pending||'—')} · כשלים: ${esc(r.defects||'—')}</div>
       <div class="pen">${esc(sentence(r))}</div>
       ${r.notes?`<div class="m" style="margin-top:4px">${esc(r.notes)}</div>`:''}
     </div>`).join('') : '<div class="sec m">אין רשומות</div>';
@@ -321,7 +323,7 @@ $('#exp-csv').onclick=()=>{
   const cols=['date','caseNo','alt',...F.map(f=>f.k),'notes'];
   const heads=['תאריך','מספר תיק','חלופה',...F.map(f=>f.l),'הערות'];
   const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;
-  const csv='﻿'+heads.map(q).join(',')+'\n'+db.records.map(r=>cols.map(c=>q(r[c])).join(',')).join('\n');
+  const csv='﻿'+heads.map(q).join(',')+'\n'+db.records.map(r=>cols.map(c=>q(Array.isArray(r[c])?r[c].join(', '):r[c])).join(',')).join('\n');
   download('מאגר-הסדרים.csv',csv,'text/csv;charset=utf-8');
 };
 $('#exp-json').onclick=()=>download('hesderim-backup.json',JSON.stringify(db,null,1),'application/json');
