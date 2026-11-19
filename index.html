@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#1f3a5f">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="הסדרים">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
 <title>מאגר הסדרים</title>
 <style>
 :root{--bg:#f4f6f9;--card:#fff;--ink:#1c2430;--mut:#6b7684;--pri:#1f3a5f;--acc:#2f6fd6;--ok:#1e8e4e;--bad:#c0392b;--line:#e2e6ec;--chip:#eef2f7}
@@ -356,5 +361,6 @@ render();
 if(!cfg.token){ show('set'); toast('יש להדביק מפתח גישה פעם אחת'); }
 else { pull().then(()=>{applyOps(pending);saveLocal();render();if(pending.length)push()}).catch(e=>{toast(e.message);setSync('לא מקוון')}); }
 </script>
+<script>if("serviceWorker" in navigator){navigator.serviceWorker.register("sw.js").catch(function(){});}</script>
 </body>
 </html>
