@@ -371,6 +371,28 @@ window.addEventListener('pageshow',refreshDate); window.addEventListener('focus'
 setInterval(refreshDate,60000);
 $('#s-repo').value=cfg.repo; $('#s-token').value=cfg.token||'';
 render();
+// ---------- קליטה מיומן ההסדרים ----------
+// היומן פותח את המאגר עם #yoman=<נתונים>: תאריך, מספר תיק, עבירה, עבר, תנאי, כשלים. ממלאים את הטופס — העונש והשמירה נשארים לך.
+function takeYoman(){
+  if(!location.hash.startsWith('#yoman=')) return false;
+  let d; try{ d=JSON.parse(decodeURIComponent(location.hash.slice(7))); }catch(e){ d=null; }
+  history.replaceState(null,'',location.pathname+location.search);
+  if(!d||typeof d!=='object') return false;
+  if(editId) endEdit();
+  resetForm(false);
+  for(const f of F){
+    const v=d[f.k]; if(v===undefined) continue;
+    if(f.multi){ const a=(Array.isArray(v)?v:[]).filter(x=>f.o.includes(x)); if(a.length) cur[f.k]=a; }
+    else if(f.o.map(String).includes(String(v))) cur[f.k]=f.num?Number(v):v;
+  }
+  if(typeof d.date==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(d.date)) $('#f-date').value=d.date;
+  if(typeof d.caseNo==='string') $('#f-caseNo').value=d.caseNo.slice(0,40);
+  if(typeof d.lawyer==='string') $('#f-lawyer').value=d.lawyer.slice(0,80);
+  paint(); show('add'); window.scrollTo(0,0);
+  return true;
+}
+const fromYoman = takeYoman();
+if(fromYoman) toast('נפתח עם הנתונים מיומן ההסדרים — השלם את העונש ושמור');
 if(!cfg.token){ show('set'); toast('יש להדביק מפתח גישה פעם אחת'); }
 else { pull().then(()=>{applyOps(pending);saveLocal();render();if(pending.length)push()}).catch(e=>{toast(e.message);setSync('לא מקוון')}); }
 </script>
