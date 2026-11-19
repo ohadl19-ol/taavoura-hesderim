@@ -1,5 +1,5 @@
 // רשת קודם; בלי אינטרנט נופלים לעותק השמור. בקשות ל-GitHub API לא נוגעים בהן.
-var C = "hesderim-v2";
+var C = "hesderim-v3";
 var CORE = ["./", "index.html", "manifest.json", "icon-192.png", "icon-512.png", "apple-touch-icon.png"];
 self.addEventListener("install", function(e){ self.skipWaiting(); e.waitUntil(caches.open(C).then(function(c){ return c.addAll(CORE); })); });
 self.addEventListener("activate", function(e){ e.waitUntil(caches.keys().then(function(k){ return Promise.all(k.filter(function(x){return x!==C;}).map(function(x){return caches.delete(x);})); }).then(function(){ return self.clients.claim(); })); });

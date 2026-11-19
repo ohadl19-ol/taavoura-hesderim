@@ -69,6 +69,9 @@ small.h{color:var(--mut);font-size:12px;display:block;margin-top:4px}
         <div><div class="lbl">תאריך</div><input type="date" id="f-date"></div>
         <div><div class="lbl">מספר תיק</div><input id="f-caseNo" inputmode="text" placeholder="לא חובה"></div>
       </div>
+      <div class="row" style="margin-top:10px">
+        <div><div class="lbl">שם הסנגור</div><input id="f-lawyer" list="lawyers" autocomplete="off" placeholder="לא חובה"><datalist id="lawyers"></datalist></div>
+      </div>
     </div>
     <div id="fields"></div>
     <div class="sec">
@@ -166,6 +169,11 @@ let cur = {}, alt = 'א', editId = null;
 const $ = s => document.querySelector(s);
 const esc = s => String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('show');clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('show'),Math.max(2200,t.length*90))}
+// התאריך בטופס מתעדכן תמיד ליום הנוכחי, אלא אם המשתמש שינה אותו ידנית או שעורכים רשומה קיימת
+let autoDate='';
+function setToday(){autoDate=today();$('#f-date').value=autoDate}
+function refreshDate(){const v=$('#f-date').value;if(!editId&&(!v||v===autoDate)&&v!==today())setToday()}
+function fillLawyers(){const dl=$('#lawyers');if(!dl)return;const names=[...new Set(db.records.map(r=>r.lawyer).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'he'));dl.innerHTML=names.map(n=>`<option value="${esc(n)}">`).join('')}
 function today(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
 function saveLocal(){localStorage.setItem(LS('cache'),JSON.stringify(db));localStorage.setItem(LS('pending'),JSON.stringify(pending));if(sha)localStorage.setItem(LS('sha'),sha);setSync()}
 function setSync(t){$('#sync').textContent = t || (pending.length?`${pending.length} ממתינות`:(cfg.token?'מסונכרן':'לא מחובר'))}
@@ -258,19 +266,21 @@ function paint(){
   });
 }
 function readForm(){
-  const r={...cur}; r.date=$('#f-date').value||today(); r.caseNo=$('#f-caseNo').value.trim(); r.notes=$('#f-notes').value.trim(); r.alt=alt;
+  const r={...cur}; r.date=$('#f-date').value||today(); r.caseNo=$('#f-caseNo').value.trim(); r.lawyer=$('#f-lawyer').value.trim(); r.notes=$('#f-notes').value.trim(); r.alt=alt;
   Object.keys(r).forEach(k=>{if(r[k]===undefined||r[k]===''||(Array.isArray(r[k])&&!r[k].length))delete r[k]});
   return r;
 }
 function resetForm(keepCtx){
   const prev = readForm();
   cur={}; $('#f-notes').value='';
-  if(keepCtx){ KEEP.forEach(k=>{ if(prev[k]!==undefined && k!=='date' && k!=='caseNo') cur[k]=Array.isArray(prev[k])?[...prev[k]]:prev[k]; }); alt = ALTS[Math.min(ALTS.indexOf(prev.alt)+1,ALTS.length-1)]; if(prev.status) cur.status=prev.status; }
-  else { $('#f-caseNo').value=''; $('#f-date').value=today(); alt='א'; }
+  if(keepCtx){ KEEP.forEach(k=>{ if(prev[k]!==undefined && k!=='date' && k!=='caseNo' && k!=='lawyer') cur[k]=Array.isArray(prev[k])?[...prev[k]]:prev[k]; }); alt = ALTS[Math.min(ALTS.indexOf(prev.alt)+1,ALTS.length-1)]; if(prev.status) cur.status=prev.status; }
+  else { $('#f-caseNo').value=''; $('#f-lawyer').value=''; setToday(); alt='א'; }
+  refreshDate();
   paint();
 }
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
 async function saveRec(keepCtx){
+  if(!editId) refreshDate();
   const r=readForm();
   if(!r.offense){toast('בחר עבירה');return}
   if(r.disq===undefined && r.service===undefined && r.prison===undefined && r.fine===undefined){toast('בחר לפחות רכיב עונש אחד');return}
@@ -282,7 +292,7 @@ async function saveRec(keepCtx){
 function startEdit(id){
   const r=db.records.find(x=>x.id===id); if(!r) return;
   editId=id; cur={}; F.forEach(f=>{if(r[f.k]!==undefined)cur[f.k]=r[f.k]});
-  $('#f-date').value=r.date||''; $('#f-caseNo').value=r.caseNo||''; $('#f-notes').value=r.notes||''; alt=r.alt||'א';
+  $('#f-date').value=r.date||''; $('#f-caseNo').value=r.caseNo||''; $('#f-lawyer').value=r.lawyer||''; $('#f-notes').value=r.notes||''; alt=r.alt||'א';
   paint(); show('add'); $('#editing').classList.remove('hide'); $('#addBar').classList.add('hide'); $('#editBar').classList.remove('hide'); window.scrollTo(0,0);
 }
 function endEdit(){editId=null;$('#editing').classList.add('hide');$('#addBar').classList.remove('hide');$('#editBar').classList.add('hide');resetForm(false)}
@@ -320,7 +330,7 @@ function render(){
   $('#list').innerHTML = L.length? L.map(r=>`
     <div class="card" data-id="${r.id}">
       <div class="t"><span>${esc(r.offense||'')} <span class="altbadge">${esc(r.alt||'א')}</span></span><span class="tag st-${esc(r.status||'')}">${esc(r.status||'')}</span></div>
-      <div class="m">${esc((r.date||'').split('-').reverse().join('.'))}${r.caseNo?' · תיק '+esc(r.caseNo):''}${r.judge?' · '+esc(r.judge):''}</div>
+      <div class="m">${esc((r.date||'').split('-').reverse().join('.'))}${r.caseNo?' · תיק '+esc(r.caseNo):''}${r.lawyer?' · עו״ד '+esc(r.lawyer):''}${r.judge?' · '+esc(r.judge):''}</div>
       <div class="m">עבר דומה: ${esc(r.record||'—')}${(r.otherRecord||[]).length?' · אחר: '+esc(r.otherRecord.join(', ')):''} · תנאי: ${esc(r.pending||'—')} · כשלים: ${esc(r.defects||'—')}</div>
       <div class="pen">${esc(sentence(r))}</div>
       ${r.notes?`<div class="m" style="margin-top:4px">${esc(r.notes)}</div>`:''}
@@ -332,8 +342,8 @@ function render(){
 // ---------- ייצוא ----------
 function download(name,text,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click()}
 $('#exp-csv').onclick=()=>{
-  const cols=['date','caseNo','alt',...F.map(f=>f.k),'notes'];
-  const heads=['תאריך','מספר תיק','חלופה',...F.map(f=>f.l),'הערות'];
+  const cols=['date','caseNo','lawyer','alt',...F.map(f=>f.k),'notes'];
+  const heads=['תאריך','מספר תיק','סנגור','חלופה',...F.map(f=>f.l),'הערות'];
   const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;
   const csv='﻿'+heads.map(q).join(',')+'\n'+db.records.map(r=>cols.map(c=>q(Array.isArray(r[c])?r[c].join(', '):r[c])).join(',')).join('\n');
   download('מאגר-הסדרים.csv',csv,'text/csv;charset=utf-8');
@@ -341,7 +351,7 @@ $('#exp-csv').onclick=()=>{
 $('#exp-json').onclick=()=>download('hesderim-backup.json',JSON.stringify(db,null,1),'application/json');
 
 // ---------- ניווט ----------
-function show(t){document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));['add','db','set'].forEach(x=>$('#tab-'+x).classList.toggle('hide',x!==t));$('#addBar').classList.toggle('hide',t!=='add'||!!editId);$('#editBar').classList.toggle('hide',t!=='add'||!editId);if(t==='db')render()}
+function show(t){document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));['add','db','set'].forEach(x=>$('#tab-'+x).classList.toggle('hide',x!==t));$('#addBar').classList.toggle('hide',t!=='add'||!!editId);$('#editBar').classList.toggle('hide',t!=='add'||!editId);if(t==='db')render(); if(t==='add'){refreshDate();fillLawyers()}}
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>show(b.dataset.tab));
 $('#b-save').onclick=()=>saveRec(false);
 $('#b-alt').onclick=()=>saveRec(true);
@@ -355,7 +365,10 @@ $('#s-save').onclick=async()=>{cfg.repo=$('#s-repo').value.trim()||cfg.repo;cfg.
 $('#syncNow').onclick=async()=>{if(pending.length)await push();else{try{await pull();saveLocal();render();toast('עודכן מהשרת')}catch(e){toast(e.message)}}};
 
 // ---------- הפעלה ----------
-buildFields(); $('#f-date').value=today(); paint();
+buildFields(); setToday(); paint(); fillLawyers();
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')refreshDate()});
+window.addEventListener('pageshow',refreshDate); window.addEventListener('focus',refreshDate);
+setInterval(refreshDate,60000);
 $('#s-repo').value=cfg.repo; $('#s-token').value=cfg.token||'';
 render();
 if(!cfg.token){ show('set'); toast('יש להדביק מפתח גישה פעם אחת'); }
